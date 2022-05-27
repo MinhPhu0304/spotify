@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/MinhPhu0304/spotify/service"
@@ -45,6 +46,8 @@ func CreateServer() Server {
 		r.Use(MustHaveSpotifyToken())
 		r.Get("/personal/top_artists", s.HandleTopArtists)
 		r.Get("/personal/top_tracks", s.HandleTopTracks)
+		r.Get("/personal/recently_played", s.HandleRecentlyPlayed)
+		r.Get("/artist/{id}", s.HandleGetArtist)
 	})
 
 	return s
@@ -66,6 +69,12 @@ func (s *Server) HandlePing(w http.ResponseWriter, r *http.Request) {
 func (s *Server) HandleTopArtists(w http.ResponseWriter, r *http.Request) {
 	spotifyToken := r.Header.Get("spotify-token")
 	topArtists, err := s.service.TopArtists(r.Context(), spotifyToken)
+
+	if err != nil && strings.Contains(err.Error(), "The access token expired") {
+		http.Redirect(w, r, os.Getenv("DASHBOARD_URI"), http.StatusFound)
+		return
+	}
+
 	if err != nil {
 		log.Error(err)
 		http.Error(w, "failed to get top artists", http.StatusInternalServerError)
@@ -86,7 +95,7 @@ func (s *Server) HandleTopTracks(w http.ResponseWriter, r *http.Request) {
 	spotifyToken := r.Header.Get("spotify-token")
 	topTracks, err := s.service.TopTracks(r.Context(), spotifyToken)
 	if err != nil {
-		log.Error(err)
+		log.WithField("Headers", r.Header).Error(err)
 		http.Error(w, "failed to get top tracks", http.StatusInternalServerError)
 		return
 	}
@@ -95,6 +104,58 @@ func (s *Server) HandleTopTracks(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		log.Error(err)
 		http.Error(w, "failed to request to spotify tracks", http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Write(resBody)
+}
+
+func (s *Server) HandleRecentlyPlayed(w http.ResponseWriter, r *http.Request) {
+	spotifyToken := r.Header.Get("spotify-token")
+	recentlyPlayed, err := s.service.RecentTracks(r.Context(), spotifyToken)
+
+	if err != nil && strings.Contains(err.Error(), "The access token expired") {
+		http.Error(w, "", http.StatusUnauthorized)
+		return
+	}
+
+	if err != nil {
+		log.WithField("Headers", r.Header).Error(err)
+		http.Error(w, "failed to get recently played tracks", http.StatusInternalServerError)
+		return
+	}
+
+	resBody, err := json.Marshal(recentlyPlayed)
+	if err != nil {
+		log.Error(err)
+		http.Error(w, "failed to request to recently played tracks", http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Write(resBody)
+}
+
+func (s *Server) HandleGetArtist(w http.ResponseWriter, r *http.Request) {
+	spotifyToken := r.Header.Get("spotify-token")
+	artistID := chi.URLParam(r, "id")
+	log.Info(artistID)
+	artistInfo, err := s.service.Artist(r.Context(), spotifyToken, artistID)
+
+	if err != nil && strings.Contains(err.Error(), "The access token expired") {
+		http.Redirect(w, r, os.Getenv("DASHBOARD_URI"), http.StatusFound)
+		return
+	}
+
+	if err != nil {
+		log.WithField("Headers", r.Header).Error(err)
+		http.Error(w, "failed to get artist info", http.StatusInternalServerError)
+		return
+	}
+
+	resBody, err := json.Marshal(artistInfo)
+	if err != nil {
+		log.Error(err)
+		http.Error(w, "", http.StatusInternalServerError)
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")

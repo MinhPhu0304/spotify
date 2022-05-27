@@ -20,9 +20,9 @@ type Service struct {
 }
 
 var authScope = []string{
+	spotifyauth.ScopeUserTopRead,
 	spotifyauth.ScopeUserFollowRead,
 	spotifyauth.ScopeUserReadRecentlyPlayed,
-	spotifyauth.ScopeUserTopRead,
 }
 
 func CreateService(redirectURI string, state string, logger *logrus.Logger) *Service {
@@ -44,7 +44,7 @@ func (s *Service) CompleteAuth(ctx context.Context, r *http.Request) (redirectUR
 		return "", errors.New(fmt.Sprintf("State mismatch: %s != %s", st, s.state))
 	}
 
-	dashboardURI := os.Getenv("DASHBOARD_URI") + "?token=" + tok.AccessToken + "&expr=" + tok.Expiry.UTC().String()
+	dashboardURI := os.Getenv("DASHBOARD_URI") + "/callback?token=" + tok.AccessToken + "&expr=" + tok.Expiry.UTC().String()
 	return dashboardURI, nil
 }
 
@@ -80,4 +80,46 @@ func (s *Service) TopTracks(ctx context.Context, spotifyToken string) (topArtist
 	}
 
 	return result.Tracks, nil
+}
+
+func (s *Service) RecentTracks(ctx context.Context, spotifyToken string) (topArtists []spotify.RecentlyPlayedItem, err error) {
+	if spotifyToken == "" {
+		return []spotify.RecentlyPlayedItem{}, errors.New("missing spotify token")
+	}
+
+	client := spotify.New(s.spotifyAuth.Client(ctx, &oauth2.Token{AccessToken: spotifyToken}))
+	result, err := client.PlayerRecentlyPlayedOpt(ctx, &spotify.RecentlyPlayedOptions{Limit: 50})
+	if err != nil {
+		return []spotify.RecentlyPlayedItem{}, errors.Wrap(err, "fail to get spotify top tracks")
+	}
+
+	return result, nil
+}
+
+type ArtistInfo struct {
+	Artirst   spotify.FullArtist  `json:"artist"`
+	TopTracks []spotify.FullTrack `json:"topTracks"`
+}
+
+func (s *Service) Artist(ctx context.Context, token string, artistID string) (ArtistInfo, error) {
+	if token == "" {
+		return ArtistInfo{}, errors.New("missing spotify token")
+	}
+
+	client := spotify.New(s.spotifyAuth.Client(ctx, &oauth2.Token{AccessToken: token}))
+	artist, err := client.GetArtist(ctx, spotify.ID(artistID))
+
+	if err != nil {
+		return ArtistInfo{}, errors.Wrap(err, "failed to get spotify artist")
+	}
+
+	topTracks, err := client.GetArtistsTopTracks(ctx, spotify.ID(artistID), "NZ")
+	if err != nil {
+		return ArtistInfo{}, errors.Wrap(err, "failed to get spotify artist top tracks")
+	}
+
+	return ArtistInfo{
+		Artirst:   *artist,
+		TopTracks: topTracks,
+	}, nil
 }
