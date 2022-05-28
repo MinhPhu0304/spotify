@@ -72,6 +72,11 @@ func (s *Server) HandlePing(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) HandleTopArtists(w http.ResponseWriter, r *http.Request) {
+	span := sentry.TransactionFromContext(r.Context())
+	if span == nil {
+		span = sentry.StartSpan(r.Context(), r.Method+" "+r.URL.Path)
+	}
+	defer span.Finish()
 	spotifyToken := r.Header.Get("spotify-token")
 	topArtists, err := s.service.TopArtists(r.Context(), spotifyToken)
 
@@ -97,6 +102,11 @@ func (s *Server) HandleTopArtists(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) HandleTopTracks(w http.ResponseWriter, r *http.Request) {
+	span := sentry.TransactionFromContext(r.Context())
+	if span == nil {
+		span = sentry.StartSpan(r.Context(), r.Method+" "+r.URL.Path)
+	}
+	defer span.Finish()
 	spotifyToken := r.Header.Get("spotify-token")
 	topTracks, err := s.service.TopTracks(r.Context(), spotifyToken)
 	if err != nil {
@@ -116,6 +126,11 @@ func (s *Server) HandleTopTracks(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) HandleRecentlyPlayed(w http.ResponseWriter, r *http.Request) {
+	span := sentry.TransactionFromContext(r.Context())
+	if span == nil {
+		span = sentry.StartSpan(r.Context(), r.Method+" "+r.URL.Path)
+	}
+	defer span.Finish()
 	spotifyToken := r.Header.Get("spotify-token")
 	recentlyPlayed, err := s.service.RecentTracks(r.Context(), spotifyToken)
 
@@ -142,6 +157,11 @@ func (s *Server) HandleRecentlyPlayed(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) HandleGetArtist(w http.ResponseWriter, r *http.Request) {
+	span := sentry.TransactionFromContext(r.Context())
+	if span == nil {
+		span = sentry.StartSpan(r.Context(), r.Method+" "+r.URL.Path)
+	}
+	defer span.Finish()
 	spotifyToken := r.Header.Get("spotify-token")
 	artistID := chi.URLParam(r, "id")
 	artistInfo, err := s.service.Artist(r.Context(), spotifyToken, artistID)
