@@ -80,8 +80,8 @@ func (s *Server) HandleTopArtists(w http.ResponseWriter, r *http.Request) {
 	spotifyToken := r.Header.Get("spotify-token")
 	topArtists, err := s.service.TopArtists(r.Context(), spotifyToken)
 
-	if err != nil && strings.Contains(err.Error(), "The access token expired") {
-		http.Redirect(w, r, os.Getenv("DASHBOARD_URI"), http.StatusFound)
+	if err != nil && (strings.Contains(err.Error(), "The access token expired") || strings.Contains(err.Error(), "Invalid access token")) {
+		http.Error(w, "", http.StatusUnauthorized)
 		return
 	}
 
@@ -109,6 +109,12 @@ func (s *Server) HandleTopTracks(w http.ResponseWriter, r *http.Request) {
 	defer span.Finish()
 	spotifyToken := r.Header.Get("spotify-token")
 	topTracks, err := s.service.TopTracks(r.Context(), spotifyToken)
+
+	if err != nil && (strings.Contains(err.Error(), "The access token expired") || strings.Contains(err.Error(), "Invalid access token")) {
+		http.Error(w, "", http.StatusUnauthorized)
+		return
+	}
+
 	if err != nil {
 		sentry.CaptureException(err)
 		http.Error(w, "failed to get top tracks", http.StatusInternalServerError)
@@ -134,7 +140,7 @@ func (s *Server) HandleRecentlyPlayed(w http.ResponseWriter, r *http.Request) {
 	spotifyToken := r.Header.Get("spotify-token")
 	recentlyPlayed, err := s.service.RecentTracks(r.Context(), spotifyToken)
 
-	if err != nil && strings.Contains(err.Error(), "The access token expired") {
+	if err != nil && (strings.Contains(err.Error(), "The access token expired") || strings.Contains(err.Error(), "Invalid access token")) {
 		http.Error(w, "", http.StatusUnauthorized)
 		return
 	}
@@ -166,8 +172,8 @@ func (s *Server) HandleGetArtist(w http.ResponseWriter, r *http.Request) {
 	artistID := chi.URLParam(r, "id")
 	artistInfo, err := s.service.Artist(r.Context(), spotifyToken, artistID)
 
-	if err != nil && strings.Contains(err.Error(), "The access token expired") {
-		http.Redirect(w, r, os.Getenv("DASHBOARD_URI"), http.StatusFound)
+	if err != nil && (strings.Contains(err.Error(), "The access token expired") || strings.Contains(err.Error(), "Invalid access token")) {
+		http.Error(w, "", http.StatusUnauthorized)
 		return
 	}
 
