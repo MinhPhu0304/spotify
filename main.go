@@ -23,6 +23,7 @@ func main() {
 		AttachStacktrace: true,
 		Environment:      "production",
 		Transport:        sentrySyncTransport,
+		TracesSampleRate: 1.0,
 	})
 
 	if err != nil {
