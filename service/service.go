@@ -22,6 +22,7 @@ type Service struct {
 var authScope = []string{
 	spotifyauth.ScopeUserTopRead,
 	spotifyauth.ScopeUserFollowRead,
+	spotifyauth.ScopeUserReadPrivate,
 	spotifyauth.ScopeUserReadRecentlyPlayed,
 }
 
@@ -114,7 +115,12 @@ func (s *Service) Artist(ctx context.Context, token string, artistID string) (Ar
 		return ArtistInfo{}, errors.Wrap(err, "failed to get spotify artist")
 	}
 
-	topTracks, err := client.GetArtistsTopTracks(ctx, spotify.ID(artistID), "NZ")
+	user, err := client.CurrentUser(ctx)
+	if err != nil {
+		return ArtistInfo{}, errors.Wrap(err, "failed to get user info")
+	}
+
+	topTracks, err := client.GetArtistsTopTracks(ctx, spotify.ID(artistID), user.Country)
 	if err != nil {
 		return ArtistInfo{}, errors.Wrap(err, "failed to get spotify artist top tracks")
 	}
