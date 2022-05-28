@@ -97,8 +97,9 @@ func (s *Service) RecentTracks(ctx context.Context, spotifyToken string) (topArt
 }
 
 type ArtistInfo struct {
-	Artirst   spotify.FullArtist  `json:"artist"`
-	TopTracks []spotify.FullTrack `json:"topTracks"`
+	Artirst       spotify.FullArtist               `json:"artist"`
+	TopTracks     []spotify.FullTrack              `json:"topTracks"`
+	AudioFeatures map[string]spotify.AudioFeatures `json:"trackFeatures"`
 }
 
 func (s *Service) Artist(ctx context.Context, token string, artistID string) (ArtistInfo, error) {
@@ -118,8 +119,36 @@ func (s *Service) Artist(ctx context.Context, token string, artistID string) (Ar
 		return ArtistInfo{}, errors.Wrap(err, "failed to get spotify artist top tracks")
 	}
 
+	tracksFeatures, err := tracksFeatures(ctx, client, allTrackID(topTracks))
+	if err != nil {
+		return ArtistInfo{}, errors.Wrap(err, "failed to get audio features")
+	}
+
 	return ArtistInfo{
-		Artirst:   *artist,
-		TopTracks: topTracks,
+		Artirst:       *artist,
+		TopTracks:     topTracks,
+		AudioFeatures: tracksFeatures,
 	}, nil
+}
+
+func allTrackID(tracks []spotify.FullTrack) []spotify.ID {
+	trackIDs := make([]spotify.ID, 0)
+	for _, track := range tracks {
+		trackIDs = append(trackIDs, track.ID)
+	}
+	return trackIDs
+}
+
+func tracksFeatures(ctx context.Context, client *spotify.Client, trackIDs []spotify.ID) (map[string]spotify.AudioFeatures, error) {
+	tracksFeatures, err := client.GetAudioFeatures(ctx, trackIDs...)
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+
+	features := make(map[string]spotify.AudioFeatures)
+	for _, track := range tracksFeatures {
+		features[string(track.ID)] = *track
+	}
+
+	return features, nil
 }
