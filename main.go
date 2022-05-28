@@ -25,7 +25,6 @@ func main() {
 		Transport:        sentrySyncTransport,
 	})
 
-	sentry.CaptureMessage("It works!")
 	if err != nil {
 		log.Error("sentry.Init: %s", err)
 		os.Exit(1)

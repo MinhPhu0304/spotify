@@ -1,5 +1,6 @@
 #!/bin/bash
 
+echo "How does this work, I don't know (╯ಠ‿ಠ )╯︵┻━┻ "
 echo "Build for linux architecture"
 
 GOOS=linux GOARCH=amd64 go build -o main main.go
