@@ -8,6 +8,8 @@ import (
 	"time"
 
 	"github.com/MinhPhu0304/spotify/service"
+	"github.com/getsentry/sentry-go"
+	sentryhttp "github.com/getsentry/sentry-go/http"
 	"github.com/go-chi/chi"
 	"github.com/go-chi/chi/middleware"
 	"github.com/go-chi/cors"
@@ -34,20 +36,23 @@ func CreateServer() Server {
 		Handler: r,
 	}
 
+	// Create an instance of sentryhttp
+	sentryHandler := sentryhttp.New(sentryhttp.Options{})
+
 	// Public route - only needs standard middleware
 	r.Group(func(r chi.Router) {
-		r.HandleFunc("/callback", s.HandleCallback)
-		r.HandleFunc("/oauth/spotify", s.HandleLoginSpotify)
+		r.HandleFunc("/callback", sentryHandler.HandleFunc(s.HandleCallback))
+		r.HandleFunc("/oauth/spotify", sentryHandler.HandleFunc(s.HandleLoginSpotify))
 		r.HandleFunc("/ping", s.HandlePing)
 	})
 
 	// Private route must have spotify token
 	r.Group(func(r chi.Router) {
 		r.Use(MustHaveSpotifyToken())
-		r.Get("/personal/top_artists", s.HandleTopArtists)
-		r.Get("/personal/top_tracks", s.HandleTopTracks)
-		r.Get("/personal/recently_played", s.HandleRecentlyPlayed)
-		r.Get("/artist/{id}", s.HandleGetArtist)
+		r.Get("/personal/top_artists", sentryHandler.HandleFunc(s.HandleTopArtists))
+		r.Get("/personal/top_tracks", sentryHandler.HandleFunc(s.HandleTopTracks))
+		r.Get("/personal/recently_played", sentryHandler.HandleFunc(s.HandleRecentlyPlayed))
+		r.Get("/artist/{id}", sentryHandler.HandleFunc(s.HandleGetArtist))
 	})
 
 	return s
@@ -76,14 +81,14 @@ func (s *Server) HandleTopArtists(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err != nil {
-		log.Error(err)
+		sentry.CaptureException(err)
 		http.Error(w, "failed to get top artists", http.StatusInternalServerError)
 		return
 	}
 
 	resBody, err := json.Marshal(topArtists)
 	if err != nil {
-		log.Error(err)
+		sentry.CaptureException(err)
 		http.Error(w, "failed to request to spotify artist", http.StatusInternalServerError)
 		return
 	}
@@ -95,14 +100,14 @@ func (s *Server) HandleTopTracks(w http.ResponseWriter, r *http.Request) {
 	spotifyToken := r.Header.Get("spotify-token")
 	topTracks, err := s.service.TopTracks(r.Context(), spotifyToken)
 	if err != nil {
-		log.WithField("Headers", r.Header).Error(err)
+		sentry.CaptureException(err)
 		http.Error(w, "failed to get top tracks", http.StatusInternalServerError)
 		return
 	}
 
 	resBody, err := json.Marshal(topTracks)
 	if err != nil {
-		log.Error(err)
+		sentry.CaptureException(err)
 		http.Error(w, "failed to request to spotify tracks", http.StatusInternalServerError)
 		return
 	}
@@ -121,13 +126,14 @@ func (s *Server) HandleRecentlyPlayed(w http.ResponseWriter, r *http.Request) {
 
 	if err != nil {
 		log.WithField("Headers", r.Header).Error(err)
+		sentry.CaptureException(err)
 		http.Error(w, "failed to get recently played tracks", http.StatusInternalServerError)
 		return
 	}
 
 	resBody, err := json.Marshal(recentlyPlayed)
 	if err != nil {
-		log.Error(err)
+		sentry.CaptureException(err)
 		http.Error(w, "failed to request to recently played tracks", http.StatusInternalServerError)
 		return
 	}
@@ -138,7 +144,6 @@ func (s *Server) HandleRecentlyPlayed(w http.ResponseWriter, r *http.Request) {
 func (s *Server) HandleGetArtist(w http.ResponseWriter, r *http.Request) {
 	spotifyToken := r.Header.Get("spotify-token")
 	artistID := chi.URLParam(r, "id")
-	log.Info(artistID)
 	artistInfo, err := s.service.Artist(r.Context(), spotifyToken, artistID)
 
 	if err != nil && strings.Contains(err.Error(), "The access token expired") {
@@ -147,14 +152,14 @@ func (s *Server) HandleGetArtist(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err != nil {
-		log.WithField("Headers", r.Header).Error(err)
+		sentry.CaptureException(err)
 		http.Error(w, "failed to get artist info", http.StatusInternalServerError)
 		return
 	}
 
 	resBody, err := json.Marshal(artistInfo)
 	if err != nil {
-		log.Error(err)
+		sentry.CaptureException(err)
 		http.Error(w, "", http.StatusInternalServerError)
 		return
 	}
