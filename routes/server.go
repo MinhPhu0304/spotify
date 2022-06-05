@@ -53,6 +53,7 @@ func CreateServer() Server {
 		r.Get("/personal/top_tracks", sentryHandler.HandleFunc(s.HandleTopTracks))
 		r.Get("/personal/recently_played", sentryHandler.HandleFunc(s.HandleRecentlyPlayed))
 		r.Get("/artist/{id}", sentryHandler.HandleFunc(s.HandleGetArtist))
+		r.Get("/artist/{id}/related-artists", sentryHandler.HandleFunc(s.HandleGetRelatedArtist))
 	})
 
 	return s
@@ -165,7 +166,7 @@ func (s *Server) HandleRecentlyPlayed(w http.ResponseWriter, r *http.Request) {
 func (s *Server) HandleGetArtist(w http.ResponseWriter, r *http.Request) {
 	span := sentry.TransactionFromContext(r.Context())
 	if span == nil {
-		span = sentry.StartSpan(r.Context(), r.Method+" "+r.URL.Path)
+		span = sentry.StartSpan(r.Context(), r.Method+" "+"/artist/{id}")
 	}
 	defer span.Finish()
 	spotifyToken := r.Header.Get("spotify-token")
@@ -180,6 +181,37 @@ func (s *Server) HandleGetArtist(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		sentry.CaptureException(err)
 		http.Error(w, "failed to get artist info", http.StatusInternalServerError)
+		return
+	}
+
+	resBody, err := json.Marshal(artistInfo)
+	if err != nil {
+		sentry.CaptureException(err)
+		http.Error(w, "", http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Write(resBody)
+}
+
+func (s *Server) HandleGetRelatedArtist(w http.ResponseWriter, r *http.Request) {
+	span := sentry.TransactionFromContext(r.Context())
+	if span == nil {
+		span = sentry.StartSpan(r.Context(), r.Method+" "+"/artist/{id}/related-artists")
+	}
+	defer span.Finish()
+	spotifyToken := r.Header.Get("spotify-token")
+	artistID := chi.URLParam(r, "id")
+	artistInfo, err := s.service.RelatedArtist(r.Context(), spotifyToken, artistID)
+
+	if err != nil && (strings.Contains(err.Error(), "The access token expired") || strings.Contains(err.Error(), "Invalid access token")) {
+		http.Error(w, "", http.StatusUnauthorized)
+		return
+	}
+
+	if err != nil {
+		sentry.CaptureException(err)
+		http.Error(w, "failed to get related artists", http.StatusInternalServerError)
 		return
 	}
 

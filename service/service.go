@@ -137,6 +137,16 @@ func (s *Service) Artist(ctx context.Context, token string, artistID string) (Ar
 	}, nil
 }
 
+func (s *Service) RelatedArtist(ctx context.Context, token string, artistID string) ([]spotify.FullArtist, error) {
+	if token == "" {
+		return []spotify.FullArtist{}, errors.New("missing spotify token")
+	}
+
+	client := spotify.New(s.spotifyAuth.Client(ctx, &oauth2.Token{AccessToken: token}))
+	artist, err := client.GetRelatedArtists(ctx, spotify.ID(artistID))
+	return artist, err
+}
+
 func allTrackID(tracks []spotify.FullTrack) []spotify.ID {
 	trackIDs := make([]spotify.ID, 0)
 	for _, track := range tracks {
