@@ -3,6 +3,7 @@ module github.com/MinhPhu0304/spotify
 go 1.17
 
 require (
+	github.com/PuerkitoBio/goquery v1.8.0
 	github.com/getsentry/sentry-go v0.13.0
 	github.com/go-chi/chi v1.5.4
 	github.com/go-chi/cors v1.2.1
@@ -13,7 +14,6 @@ require (
 )
 
 require (
-	github.com/PuerkitoBio/goquery v1.8.0 // indirect
 	github.com/andybalholm/cascadia v1.3.1 // indirect
 	github.com/aws/aws-lambda-go v1.9.0 // indirect
 )
