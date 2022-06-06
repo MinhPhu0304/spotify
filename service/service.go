@@ -97,46 +97,6 @@ func (s *Service) RecentTracks(ctx context.Context, spotifyToken string) (topArt
 	return result, nil
 }
 
-type ArtistInfo struct {
-	Artirst       spotify.FullArtist               `json:"artist"`
-	TopTracks     []spotify.FullTrack              `json:"topTracks"`
-	AudioFeatures map[string]spotify.AudioFeatures `json:"trackFeatures"`
-}
-
-func (s *Service) Artist(ctx context.Context, token string, artistID string) (ArtistInfo, error) {
-	if token == "" {
-		return ArtistInfo{}, errors.New("missing spotify token")
-	}
-
-	client := spotify.New(s.spotifyAuth.Client(ctx, &oauth2.Token{AccessToken: token}))
-	artist, err := client.GetArtist(ctx, spotify.ID(artistID))
-
-	if err != nil {
-		return ArtistInfo{}, errors.Wrap(err, "failed to get spotify artist")
-	}
-
-	user, err := client.CurrentUser(ctx)
-	if err != nil {
-		return ArtistInfo{}, errors.Wrap(err, "failed to get user info")
-	}
-
-	topTracks, err := client.GetArtistsTopTracks(ctx, spotify.ID(artistID), user.Country)
-	if err != nil {
-		return ArtistInfo{}, errors.Wrap(err, "failed to get spotify artist top tracks")
-	}
-
-	tracksFeatures, err := tracksFeatures(ctx, client, allTrackID(topTracks))
-	if err != nil {
-		return ArtistInfo{}, errors.Wrap(err, "failed to get audio features")
-	}
-
-	return ArtistInfo{
-		Artirst:       *artist,
-		TopTracks:     topTracks,
-		AudioFeatures: tracksFeatures,
-	}, nil
-}
-
 func (s *Service) RelatedArtist(ctx context.Context, token string, artistID string) ([]spotify.FullArtist, error) {
 	if token == "" {
 		return []spotify.FullArtist{}, errors.New("missing spotify token")
