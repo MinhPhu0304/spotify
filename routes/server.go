@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/MinhPhu0304/spotify/repository"
 	"github.com/MinhPhu0304/spotify/service"
 	"github.com/getsentry/sentry-go"
 	sentryhttp "github.com/getsentry/sentry-go/http"
@@ -24,7 +25,8 @@ type Server struct {
 func CreateServer() Server {
 	redirectURI := os.Getenv("CALLBACK_URI")
 	logger := log.New()
-	service := service.CreateService(redirectURI, "spotifyOauth", logger)
+	repo := repository.CreateInMemoryRepo()
+	service := service.CreateService(redirectURI, "spotifyOauth", logger, repo)
 
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)

@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"os"
 
+	"github.com/MinhPhu0304/spotify/repository"
+	"github.com/MinhPhu0304/spotify/trace"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/zmb3/spotify/v2"
@@ -17,6 +19,7 @@ type Service struct {
 	spotifyAuth *spotifyauth.Authenticator
 	state       string
 	log         *logrus.Logger
+	repo        repository.Repository
 }
 
 var authScope = []string{
@@ -26,13 +29,14 @@ var authScope = []string{
 	spotifyauth.ScopeUserReadRecentlyPlayed,
 }
 
-func CreateService(redirectURI string, state string, logger *logrus.Logger) *Service {
+func CreateService(redirectURI string, state string, logger *logrus.Logger, repository repository.Repository) *Service {
 	auth := spotifyauth.New(spotifyauth.WithRedirectURL(redirectURI), spotifyauth.WithScopes(authScope...))
 
 	return &Service{
 		spotifyAuth: auth,
 		state:       state,
 		log:         logger,
+		repo:        repository,
 	}
 }
 
@@ -58,7 +62,7 @@ func (s *Service) TopArtists(ctx context.Context, spotifyToken string) (topArtis
 		return []spotify.FullArtist{}, errors.New("missing spotify token")
 	}
 
-	client := spotify.New(s.spotifyAuth.Client(ctx, &oauth2.Token{AccessToken: spotifyToken}))
+	client := spotify.New(trace.WrapWithTrace(s.spotifyAuth.Client(ctx, &oauth2.Token{AccessToken: spotifyToken})))
 	result, err := client.CurrentUsersTopArtists(ctx, spotify.Limit(50))
 	if err != nil {
 		return []spotify.FullArtist{}, errors.Wrap(err, "fail to get spotify top artist")
@@ -74,7 +78,7 @@ func (s *Service) TopTracks(ctx context.Context, spotifyToken string) (topArtist
 		return []spotify.FullTrack{}, errors.New("missing spotify token")
 	}
 
-	client := spotify.New(s.spotifyAuth.Client(ctx, &oauth2.Token{AccessToken: spotifyToken}))
+	client := spotify.New(trace.WrapWithTrace(s.spotifyAuth.Client(ctx, &oauth2.Token{AccessToken: spotifyToken})))
 	result, err := client.CurrentUsersTopTracks(ctx, spotify.Limit(50))
 	if err != nil {
 		return []spotify.FullTrack{}, errors.Wrap(err, "fail to get spotify top tracks")
@@ -88,7 +92,7 @@ func (s *Service) RecentTracks(ctx context.Context, spotifyToken string) (topArt
 		return []spotify.RecentlyPlayedItem{}, errors.New("missing spotify token")
 	}
 
-	client := spotify.New(s.spotifyAuth.Client(ctx, &oauth2.Token{AccessToken: spotifyToken}))
+	client := spotify.New(trace.WrapWithTrace(s.spotifyAuth.Client(ctx, &oauth2.Token{AccessToken: spotifyToken})))
 	result, err := client.PlayerRecentlyPlayedOpt(ctx, &spotify.RecentlyPlayedOptions{Limit: 50})
 	if err != nil {
 		return []spotify.RecentlyPlayedItem{}, errors.Wrap(err, "fail to get spotify top tracks")
@@ -102,7 +106,7 @@ func (s *Service) RelatedArtist(ctx context.Context, token string, artistID stri
 		return []spotify.FullArtist{}, errors.New("missing spotify token")
 	}
 
-	client := spotify.New(s.spotifyAuth.Client(ctx, &oauth2.Token{AccessToken: token}))
+	client := spotify.New(trace.WrapWithTrace(s.spotifyAuth.Client(ctx, &oauth2.Token{AccessToken: token})))
 	artist, err := client.GetRelatedArtists(ctx, spotify.ID(artistID))
 	return artist, err
 }

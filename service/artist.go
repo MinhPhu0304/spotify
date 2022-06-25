@@ -4,7 +4,10 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"sync"
 
+	"github.com/MinhPhu0304/spotify/repository"
+	"github.com/MinhPhu0304/spotify/trace"
 	"github.com/PuerkitoBio/goquery"
 	"github.com/getsentry/sentry-go"
 	"github.com/pkg/errors"
@@ -24,37 +27,52 @@ func (s *Service) Artist(ctx context.Context, token string, artistID string) (Ar
 		return ArtistInfo{}, errors.New("missing spotify token")
 	}
 
-	client := spotify.New(s.spotifyAuth.Client(ctx, &oauth2.Token{AccessToken: token}))
+	client := spotify.New(trace.WrapWithTrace(s.spotifyAuth.Client(ctx, &oauth2.Token{AccessToken: token})))
 	artist, err := client.GetArtist(ctx, spotify.ID(artistID))
 
 	if err != nil {
 		return ArtistInfo{}, errors.Wrap(err, "failed to get spotify artist")
 	}
 
-	user, err := client.CurrentUser(ctx)
+	u, err := s.getCurrentUser(ctx, client, token)
 	if err != nil {
 		return ArtistInfo{}, errors.Wrap(err, "failed to get user info")
 	}
 
-	topTracks, err := client.GetArtistsTopTracks(ctx, spotify.ID(artistID), user.Country)
+	topTracks, err := client.GetArtistsTopTracks(ctx, spotify.ID(artistID), u.Country)
 	if err != nil {
 		return ArtistInfo{}, errors.Wrap(err, "failed to get spotify artist top tracks")
 	}
 
-	bio, err := s.getArtistBio(ctx, artist.Name)
-	if err != nil {
-		sentry.CaptureException(err)
-	}
+	bio := make([]string, 0)
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+	go func() {
+		bio, err = s.getArtistBio(ctx, artist.Name)
+		if err != nil {
+			sentry.CaptureException(err)
+		}
+		wg.Done()
+	}()
 
-	tracksFeatures, err := tracksFeatures(ctx, client, allTrackID(topTracks))
-	if err != nil {
+	f := make(map[string]spotify.AudioFeatures)
+	var errF error
+	wg.Add(1)
+	go func() {
+		f, errF = tracksFeatures(ctx, client, allTrackID(topTracks))
+		wg.Done()
+	}()
+
+	wg.Wait()
+
+	if errF != nil {
 		return ArtistInfo{}, errors.Wrap(err, "failed to get audio features")
 	}
 
 	return ArtistInfo{
 		Artirst:       *artist,
 		TopTracks:     topTracks,
-		AudioFeatures: tracksFeatures,
+		AudioFeatures: f,
 		Bio:           bio,
 	}, nil
 }
@@ -91,4 +109,14 @@ func (s *Service) getArtistBio(ctx context.Context, name string) ([]string, erro
 	})
 
 	return bio, nil
+}
+
+func (s *Service) getCurrentUser(ctx context.Context, client *spotify.Client, token string) (*spotify.PrivateUser, error) {
+	u, err := s.repo.GetUser(token)
+	if errors.Is(err, repository.ErrNotFound) || errors.Is(err, repository.ErrInvalidType) {
+		user, err := client.CurrentUser(ctx)
+		s.repo.InsertUser(token, user, nil) // not the end of th world if repo fail to insert
+		return user, err
+	}
+	return u, nil
 }
