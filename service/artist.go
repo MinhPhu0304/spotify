@@ -79,20 +79,24 @@ func (s *Service) Artist(ctx context.Context, token string, artistID string) (Ar
 
 func (s *Service) getArtistBio(ctx context.Context, name string) ([]string, error) {
 	c := trace.DefaultTracedClient()
-	resp, err := c.Get(fmt.Sprintf("https://www.last.fm/music/%s/+wiki", name))
+	r, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://www.last.fm/music/%s/+wiki", name), nil)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := c.Do(r)
 
 	if err != nil {
-		return []string{}, err
+		return nil, err
 	}
 
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return []string{}, errors.New(fmt.Sprintf("status code error: %d %s", resp.StatusCode, resp.Status))
+		return nil, errors.New(fmt.Sprintf("status code error: %d %s", resp.StatusCode, resp.Status))
 	}
 
 	doc, err := goquery.NewDocumentFromReader(resp.Body)
 	if err != nil {
-		return []string{}, errors.Wrap(err, "failed to parse body")
+		return nil, errors.Wrap(err, "failed to parse body")
 	}
 
 	bio := make([]string, 0)
