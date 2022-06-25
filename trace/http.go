@@ -17,7 +17,7 @@ func newTracingTransport(roundTripper http.RoundTripper) *tracingTransport {
 
 func (t *tracingTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	opName := fmt.Sprintf("HTTP %s %s", req.Method, req.URL.String())
-	span := sentry.StartSpan(req.Context(), opName)
+	span := sentry.StartSpan(req.Context(), opName, sentry.TransactionName(req.URL.Path))
 	defer span.Finish()
 
 	span.SetTag("url", req.URL.String())
@@ -38,4 +38,11 @@ func (t *tracingTransport) RoundTrip(req *http.Request) (*http.Response, error) 
 func WrapWithTrace(client *http.Client) *http.Client {
 	client.Transport = newTracingTransport(client.Transport)
 	return client
+}
+
+func DefaultTracedClient() *http.Client {
+	c := &http.Client{
+		Transport: newTracingTransport(http.DefaultTransport),
+	}
+	return c
 }

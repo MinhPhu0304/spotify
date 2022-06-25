@@ -78,7 +78,8 @@ func (s *Service) Artist(ctx context.Context, token string, artistID string) (Ar
 }
 
 func (s *Service) getArtistBio(ctx context.Context, name string) ([]string, error) {
-	resp, err := http.Get(fmt.Sprintf("https://www.last.fm/music/%s/+wiki", name))
+	c := trace.DefaultTracedClient()
+	resp, err := c.Get(fmt.Sprintf("https://www.last.fm/music/%s/+wiki", name))
 
 	if err != nil {
 		return []string{}, err
