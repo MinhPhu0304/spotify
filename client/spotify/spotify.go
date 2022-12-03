@@ -66,7 +66,7 @@ func (s *Spotify) TopArtists(ctx context.Context, token string, limit int) ([]sp
 }
 
 func (s *Spotify) TopTracks(ctx context.Context, token string, opts ...spotify.RequestOption) ([]spotify.FullTrack, error) {
-	if t, err := s.repo.GetUserTopTracks(token); err != nil {
+	if t, err := s.repo.GetUserTopTracks(token); err != nil && len(t) != 0 {
 		return t, nil
 	}
 

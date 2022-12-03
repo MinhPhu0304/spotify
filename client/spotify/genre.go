@@ -7,7 +7,7 @@ import (
 )
 
 func (s *Spotify) Genres(ctx context.Context, token string) ([]string, error) {
-	if g, err := s.repo.GetGenres(); err != nil {
+	if g, err := s.repo.GetGenres(); err != nil && len(g) != 0 {
 		return g, nil
 	}
 

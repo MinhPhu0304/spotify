@@ -67,7 +67,7 @@ func (s *Spotify) Artist(ctx context.Context, token string, artistID string) (ty
 }
 
 func (s *Spotify) getArtistBio(ctx context.Context, name string, artistID string) ([]string, error) {
-	if bio, err := s.repo.GetArtistBio(artistID); err != nil {
+	if bio, err := s.repo.GetArtistBio(artistID); err != nil && len(bio) != 0 {
 		return bio, nil
 	}
 
