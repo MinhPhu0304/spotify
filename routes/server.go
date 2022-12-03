@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/MinhPhu0304/spotify/client/spotify"
 	"github.com/MinhPhu0304/spotify/repository"
 	"github.com/MinhPhu0304/spotify/service"
 	"github.com/getsentry/sentry-go"
@@ -14,7 +15,6 @@ import (
 	"github.com/go-chi/chi"
 	"github.com/go-chi/chi/middleware"
 	"github.com/go-chi/cors"
-	log "github.com/sirupsen/logrus"
 )
 
 type Server struct {
@@ -24,9 +24,9 @@ type Server struct {
 
 func CreateServer() Server {
 	redirectURI := os.Getenv("CALLBACK_URI")
-	logger := log.New()
 	repo := repository.CreateInMemoryRepo()
-	service := service.CreateService(redirectURI, "spotifyOauth", logger, repo)
+	sc := spotify.NewSpotifyClient(redirectURI, "spotifyOauth", repo, os.Getenv("DASHBOARD_URI"))
+	srvc := service.NewService(sc)
 
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
@@ -34,7 +34,7 @@ func CreateServer() Server {
 	r.Use(middleware.Timeout(time.Second * 60))
 	r.Use(cors.AllowAll().Handler)
 	s := Server{
-		service: *service,
+		service: *srvc,
 		Handler: r,
 	}
 
@@ -53,6 +53,7 @@ func CreateServer() Server {
 		r.Use(MustHaveSpotifyToken())
 		r.Get("/personal/top_artists", sentryHandler.HandleFunc(s.HandleTopArtists))
 		r.Get("/personal/top_tracks", sentryHandler.HandleFunc(s.HandleTopTracks))
+		r.Get("/genres", sentryHandler.HandleFunc(s.HandleGetGenres))
 		r.Get("/personal/recently_played", sentryHandler.HandleFunc(s.HandleRecentlyPlayed))
 		r.Get("/artist/{id}", sentryHandler.HandleFunc(s.HandleGetArtist))
 		r.Get("/artist/{id}/related-artists", sentryHandler.HandleFunc(s.HandleGetRelatedArtist))
@@ -89,15 +90,13 @@ func (s *Server) HandleTopArtists(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err != nil {
-		sentry.CaptureException(err)
-		http.Error(w, "failed to get top artists", http.StatusInternalServerError)
+		HandleError(w, "failed to get top artists", err, http.StatusInternalServerError)
 		return
 	}
 
 	resBody, err := json.Marshal(topArtists)
 	if err != nil {
-		sentry.CaptureException(err)
-		http.Error(w, "failed to request to spotify artist", http.StatusInternalServerError)
+		HandleError(w, "failed to request to spotify artist", err, http.StatusInternalServerError)
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
@@ -119,8 +118,7 @@ func (s *Server) HandleTopTracks(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err != nil {
-		sentry.CaptureException(err)
-		http.Error(w, "failed to get top tracks", http.StatusInternalServerError)
+		HandleError(w, "failed to get top tracks", err, http.StatusInternalServerError)
 		return
 	}
 
@@ -149,9 +147,7 @@ func (s *Server) HandleRecentlyPlayed(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err != nil {
-		log.WithField("Headers", r.Header).Error(err)
-		sentry.CaptureException(err)
-		http.Error(w, "failed to get recently played tracks", http.StatusInternalServerError)
+		HandleError(w, "failed to get recently played tracks", err, http.StatusInternalServerError)
 		return
 	}
 
@@ -181,15 +177,13 @@ func (s *Server) HandleGetArtist(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err != nil {
-		sentry.CaptureException(err)
-		http.Error(w, "failed to get artist info", http.StatusInternalServerError)
+		HandleError(w, "failed to get artist info", err, http.StatusInternalServerError)
 		return
 	}
 
 	resBody, err := json.Marshal(artistInfo)
 	if err != nil {
-		sentry.CaptureException(err)
-		http.Error(w, "", http.StatusInternalServerError)
+		HandleError(w, "", err, http.StatusInternalServerError)
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
@@ -212,15 +206,13 @@ func (s *Server) HandleGetRelatedArtist(w http.ResponseWriter, r *http.Request) 
 	}
 
 	if err != nil {
-		sentry.CaptureException(err)
-		http.Error(w, "failed to get related artists", http.StatusInternalServerError)
+		HandleError(w, "failed to get related artists", err, http.StatusInternalServerError)
 		return
 	}
 
 	resBody, err := json.Marshal(artistInfo)
 	if err != nil {
-		sentry.CaptureException(err)
-		http.Error(w, "", http.StatusInternalServerError)
+		HandleError(w, "", err, http.StatusInternalServerError)
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
@@ -228,5 +220,28 @@ func (s *Server) HandleGetRelatedArtist(w http.ResponseWriter, r *http.Request) 
 }
 
 func (s *Server) HandleLoginSpotify(w http.ResponseWriter, r *http.Request) {
-	http.Redirect(w, r, s.service.GetAuthURL(), http.StatusFound)
+	http.Redirect(w, r, s.service.AuthURL(), http.StatusFound)
+}
+
+func (s *Server) HandleGetGenres(w http.ResponseWriter, r *http.Request) {
+	span := sentry.TransactionFromContext(r.Context())
+	if span == nil {
+		span = sentry.StartSpan(r.Context(), r.Method+" "+"/artist/{id}/related-artists")
+	}
+	defer span.Finish()
+	spotifyToken := r.Header.Get("spotify-token")
+	g, err := s.service.Genres(r.Context(), spotifyToken)
+	if err != nil {
+		HandleError(w, "failed to get genres", err, http.StatusInternalServerError)
+		return
+	}
+	resBody, err := json.Marshal(struct {
+		Genres []string `json:"genres"`
+	}{Genres: g})
+	if err != nil {
+		HandleError(w, "", err, http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Write(resBody)
 }

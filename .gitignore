@@ -1,6 +1,8 @@
-.env
+*
+!/**/
+!*.*
 .DS_Store
-main
 *.zip
+.env
+main
 settings.json
-spotify
