@@ -105,20 +105,6 @@ func allTrackID(tracks []spotify.FullTrack) []spotify.ID {
 	return trackIDs
 }
 
-func tracksFeatures(ctx context.Context, client *spotify.Client, trackIDs []spotify.ID) (map[string]spotify.AudioFeatures, error) {
-	tracksFeatures, err := client.GetAudioFeatures(ctx, trackIDs...)
-	if err != nil {
-		return nil, errors.WithStack(err)
-	}
-
-	features := make(map[string]spotify.AudioFeatures)
-	for _, track := range tracksFeatures {
-		features[string(track.ID)] = *track
-	}
-
-	return features, nil
-}
-
 func (s *Spotify) clientWithTrace(ctx context.Context, token string) *spotify.Client {
 	return spotify.New(trace.WrapWithTrace(s.spotifyAuth.Client(ctx, &oauth2.Token{AccessToken: token})))
 }

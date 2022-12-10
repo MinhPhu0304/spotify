@@ -56,6 +56,7 @@ func CreateServer() Server {
 		r.Get("/genres", sentryHandler.HandleFunc(s.HandleGetGenres))
 		r.Get("/personal/recently_played", sentryHandler.HandleFunc(s.HandleRecentlyPlayed))
 		r.Get("/artist/{id}", sentryHandler.HandleFunc(s.HandleGetArtist))
+		r.Get("/song/{id}", sentryHandler.HandleFunc(s.HandleGetSong))
 		r.Get("/artist/{id}/related-artists", sentryHandler.HandleFunc(s.HandleGetRelatedArtist))
 	})
 
@@ -238,6 +239,35 @@ func (s *Server) HandleGetGenres(w http.ResponseWriter, r *http.Request) {
 	resBody, err := json.Marshal(struct {
 		Genres []string `json:"genres"`
 	}{Genres: g})
+	if err != nil {
+		HandleError(w, "", err, http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Write(resBody)
+}
+
+func (s *Server) HandleGetSong(w http.ResponseWriter, r *http.Request) {
+	span := sentry.TransactionFromContext(r.Context())
+	if span == nil {
+		span = sentry.StartSpan(r.Context(), r.Method+" "+"/song/{id}")
+	}
+	defer span.Finish()
+	spotifyToken := r.Header.Get("spotify-token")
+	artistID := chi.URLParam(r, "id")
+	sDetails, err := s.service.SongDetails(r.Context(), spotifyToken, artistID)
+
+	if err != nil && (strings.Contains(err.Error(), "The access token expired") || strings.Contains(err.Error(), "Invalid access token")) {
+		http.Error(w, "", http.StatusUnauthorized)
+		return
+	}
+
+	if err != nil {
+		HandleError(w, "failed to get song info", err, http.StatusInternalServerError)
+		return
+	}
+
+	resBody, err := json.Marshal(sDetails)
 	if err != nil {
 		HandleError(w, "", err, http.StatusInternalServerError)
 		return
