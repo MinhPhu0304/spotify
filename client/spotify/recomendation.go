@@ -9,6 +9,9 @@ import (
 
 func (c *Spotify) Recommendation(ctx context.Context, token string, trackID string) ([]spotify.SimpleTrack, error) {
 	client := c.clientWithTrace(ctx, token)
+	if client == nil {
+		return nil, errors.New("can not create spotify client")
+	}
 	result, err := client.GetRecommendations(ctx,
 		spotify.Seeds{Tracks: []spotify.ID{spotify.ID(trackID)}},
 		nil,

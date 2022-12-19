@@ -28,6 +28,8 @@ func CreateServer() Server {
 	sc := spotify.NewSpotifyClient(redirectURI, "spotifyOauth", repo, os.Getenv("DASHBOARD_URI"))
 	srvc := service.NewService(sc)
 
+	// Create an instance of sentryhttp
+	sentryHandler := sentryhttp.New(sentryhttp.Options{Repanic: true})
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
@@ -37,9 +39,6 @@ func CreateServer() Server {
 		service: *srvc,
 		Handler: r,
 	}
-
-	// Create an instance of sentryhttp
-	sentryHandler := sentryhttp.New(sentryhttp.Options{})
 
 	// Public route - only needs standard middleware
 	r.Group(func(r chi.Router) {

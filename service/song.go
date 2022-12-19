@@ -25,6 +25,7 @@ func (s *Service) SongDetails(ctx context.Context, spotifyToken string, trackID 
 	defer recCancel()
 	go func(ctx context.Context) {
 		defer wg.Done()
+		defer sentry.RecoverWithContext(ctx)
 		r, err := s.c.Recommendation(ctx, spotifyToken, trackID)
 		if err != nil {
 			sentry.CaptureException(err)
@@ -40,6 +41,7 @@ func (s *Service) SongDetails(ctx context.Context, spotifyToken string, trackID 
 	defer featureCancel()
 	go func(ctx context.Context) {
 		defer wg.Done()
+		defer sentry.RecoverWithContext(ctx)
 		f, err := s.c.TrackFeatures(ctx, spotifyToken, []spotifyClient.ID{spotifyClient.ID(trackID)})
 		if err != nil {
 			sentry.CaptureException(err)
@@ -56,6 +58,7 @@ func (s *Service) SongDetails(ctx context.Context, spotifyToken string, trackID 
 	defer trackCancel()
 	go func(ctx context.Context) {
 		defer wg.Done()
+		defer sentry.RecoverWithContext(ctx)
 		t, err := s.c.Track(ctx, spotifyToken, trackID)
 		if err != nil {
 			sentry.CaptureException(err)

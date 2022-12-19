@@ -37,19 +37,21 @@ func (s *Spotify) Artist(ctx context.Context, token string, artistID string) (ty
 	wg := sync.WaitGroup{}
 	wg.Add(1)
 	go func() {
+		defer wg.Done()
+		defer sentry.RecoverWithContext(ctx)
 		bio, err = s.getArtistBio(ctx, artist.Name, artistID)
 		if err != nil {
 			sentry.CaptureException(err)
 		}
-		wg.Done()
 	}()
 
 	f := make(map[string]spotify.AudioFeatures)
 	var errF error
 	wg.Add(1)
 	go func() {
+		defer wg.Done()
+		defer sentry.RecoverWithContext(ctx)
 		f, errF = tracksFeatures(ctx, spotifyClient, allTrackID(topTracks))
-		wg.Done()
 	}()
 
 	wg.Wait()
