@@ -6,15 +6,16 @@ import (
 	"strings"
 	"time"
 
+	"github.com/getsentry/sentry-go"
+	sentryhttp "github.com/getsentry/sentry-go/http"
+	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
+	"github.com/go-chi/cors"
+
 	"github.com/MinhPhu0304/spotify/client/lastfm"
 	"github.com/MinhPhu0304/spotify/client/spotify"
 	"github.com/MinhPhu0304/spotify/repository"
 	"github.com/MinhPhu0304/spotify/service"
-	"github.com/getsentry/sentry-go"
-	sentryhttp "github.com/getsentry/sentry-go/http"
-	"github.com/go-chi/chi"
-	"github.com/go-chi/chi/middleware"
-	"github.com/go-chi/cors"
 )
 
 type Server struct {
