@@ -30,8 +30,7 @@ var linkRegex = regexp.MustCompile(`<a[^>]*>|<\/a>`)
 
 func Client(token string) LastFMClient {
 	c := trace.WrapWithTrace(&http.Client{
-		Transport: http.DefaultTransport,
-		Timeout:   1 * time.Minute, // Something is really wrong to take 1 min
+		Timeout: 1 * time.Minute, // Something is really wrong to take 1 min
 	})
 	return &lastFMClient{
 		token:  token,
