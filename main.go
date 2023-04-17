@@ -24,6 +24,7 @@ func main() {
 		AttachStacktrace: true,
 		Environment:      "production",
 		Transport:        sentrySyncTransport,
+		EnableTracing:    true,
 		TracesSampleRate: 1.0,
 	}); err != nil {
 		log.Errorf("sentry.Init: %s", err)
