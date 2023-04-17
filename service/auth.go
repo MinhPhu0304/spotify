@@ -6,9 +6,9 @@ import (
 )
 
 func (s *Service) CompleteAuth(ctx context.Context, r *http.Request) (redirectURI string, err error) {
-	return s.c.CompleteAuth(ctx, r)
+	return s.spotifyClient.CompleteAuth(ctx, r)
 }
 
 func (s *Service) AuthURL() string {
-	return s.c.GetAuthURL()
+	return s.spotifyClient.GetAuthURL()
 }

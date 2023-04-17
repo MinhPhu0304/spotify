@@ -16,9 +16,6 @@ func (s *Spotify) Genres(ctx context.Context, token string) ([]string, error) {
 	if err != nil {
 		return []string{}, errors.Wrap(err, "fail to get spotify genre seeds")
 	}
-
-	defer func() {
-		s.repo.InsertGenres(result, nil)
-	}()
+	go s.repo.InsertGenres(result, nil)
 	return result, nil
 }

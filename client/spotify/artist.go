@@ -2,22 +2,29 @@ package spotify
 
 import (
 	"context"
-	"fmt"
-	"net/http"
+	"strings"
 	"sync"
 
+	"github.com/MinhPhu0304/spotify/client/lastfm"
 	"github.com/MinhPhu0304/spotify/repository"
-	"github.com/MinhPhu0304/spotify/trace"
 	"github.com/MinhPhu0304/spotify/types"
-	"github.com/PuerkitoBio/goquery"
+	lastfmtype "github.com/MinhPhu0304/spotify/types/lastfm"
 	"github.com/getsentry/sentry-go"
 	"github.com/pkg/errors"
 	"github.com/zmb3/spotify/v2"
 )
 
-func (s *Spotify) Artist(ctx context.Context, token string, artistID string) (types.ArtistInfo, error) {
+func (s *Spotify) artist(ctx context.Context, artistID string, client *spotify.Client) (*spotify.FullArtist, error) {
+	if artist, _ := s.repo.GetSpotifyArtist(artistID); artist != nil {
+		return artist, nil
+	}
+	artist, err := client.GetArtist(ctx, spotify.ID(artistID))
+	return artist, err
+}
+
+func (s *Spotify) Artist(ctx context.Context, token string, artistID string, lastFMClient lastfm.LastFMClient) (types.ArtistInfo, error) {
 	spotifyClient := s.clientWithTrace(ctx, token)
-	artist, err := spotifyClient.GetArtist(ctx, spotify.ID(artistID))
+	artist, err := s.artist(ctx, artistID, spotifyClient)
 
 	if err != nil {
 		return types.ArtistInfo{}, errors.Wrap(err, "failed to get spotify artist")
@@ -33,15 +40,20 @@ func (s *Spotify) Artist(ctx context.Context, token string, artistID string) (ty
 		return types.ArtistInfo{}, errors.Wrap(err, "failed to get spotify artist top tracks")
 	}
 
-	bio := make([]string, 0)
+	bio := lastfmtype.LastFMBio{}
 	wg := sync.WaitGroup{}
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
 		defer sentry.RecoverWithContext(ctx)
-		bio, err = s.getArtistBio(ctx, artist.Name, artistID)
-		if err != nil {
-			sentry.CaptureException(err)
+		if abio, err := s.repo.GetArtistBio(artistID); errors.Is(err, repository.ErrNotFound) || errors.Is(err, repository.ErrInvalidType) {
+			bio, err = lastFMClient.GetArtistBio(ctx, artist.Name)
+			if err != nil {
+				sentry.CaptureException(err)
+			}
+			s.repo.InsertArtistBio(&bio, artistID)
+		} else {
+			bio = *abio
 		}
 	}()
 
@@ -64,52 +76,8 @@ func (s *Spotify) Artist(ctx context.Context, token string, artistID string) (ty
 		Artirst:       *artist,
 		TopTracks:     topTracks,
 		AudioFeatures: f,
-		Bio:           bio,
+		Bio:           strings.Split(bio.Artist.Bio.Content, "\n"),
 	}, nil
-}
-
-func (s *Spotify) getArtistBio(ctx context.Context, name string, artistID string) ([]string, error) {
-	if bio, err := s.repo.GetArtistBio(artistID); err != nil && len(bio) != 0 {
-		return bio, nil
-	}
-
-	c := trace.DefaultTracedClient()
-	r, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://www.last.fm/music/%s/+wiki", name), nil)
-	if err != nil {
-		return nil, err
-	}
-	resp, err := c.Do(r)
-
-	if err != nil {
-		return nil, err
-	}
-
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return nil, errors.New(fmt.Sprintf("status code error: %d %s", resp.StatusCode, resp.Status))
-	}
-
-	doc, err := goquery.NewDocumentFromReader(resp.Body)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to parse body")
-	}
-
-	bio := make([]string, 0)
-	noWiki := false
-	doc.Find("no-data-message--wiki").Each(func(_ int, s *goquery.Selection) {
-		noWiki = true
-	})
-	defer func() {
-		s.repo.InsertArtistBio(bio, artistID, nil)
-	}()
-	if noWiki {
-		return bio, nil
-	}
-
-	doc.Find("div.wiki-content p").Each(func(_ int, s *goquery.Selection) {
-		bio = append(bio, s.Text())
-	})
-	return bio, nil
 }
 
 func (s *Spotify) currentUser(ctx context.Context, client *spotify.Client, token string) (*spotify.PrivateUser, error) {

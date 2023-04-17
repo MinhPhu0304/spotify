@@ -3,10 +3,10 @@ package routes
 import (
 	"encoding/json"
 	"net/http"
-	"os"
 	"strings"
 	"time"
 
+	"github.com/MinhPhu0304/spotify/client/lastfm"
 	"github.com/MinhPhu0304/spotify/client/spotify"
 	"github.com/MinhPhu0304/spotify/repository"
 	"github.com/MinhPhu0304/spotify/service"
@@ -22,11 +22,17 @@ type Server struct {
 	Handler http.Handler
 }
 
-func CreateServer() Server {
-	redirectURI := os.Getenv("CALLBACK_URI")
+type Config struct {
+	SpotifyCallBackURI  string
+	SpotifyDashboardURI string
+	LastFMToken         string
+}
+
+func CreateServer(config Config) Server {
 	repo := repository.CreateInMemoryRepo()
-	sc := spotify.NewSpotifyClient(redirectURI, "spotifyOauth", repo, os.Getenv("DASHBOARD_URI"))
-	srvc := service.NewService(sc)
+	sc := spotify.NewSpotifyClient(config.SpotifyCallBackURI, "spotifyOauth", repo, config.SpotifyDashboardURI)
+	lc := lastfm.Client(config.LastFMToken)
+	srvc := service.NewService(sc, lc, repo)
 
 	// Create an instance of sentryhttp
 	sentryHandler := sentryhttp.New(sentryhttp.Options{Repanic: true})
@@ -162,14 +168,15 @@ func (s *Server) HandleRecentlyPlayed(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) HandleGetArtist(w http.ResponseWriter, r *http.Request) {
-	span := sentry.TransactionFromContext(r.Context())
+	ctx := r.Context()
+	span := sentry.TransactionFromContext(ctx)
 	if span == nil {
-		span = sentry.StartSpan(r.Context(), r.Method+" "+"/artist/{id}")
+		span = sentry.StartSpan(ctx, r.Method+" "+"/artist/{id}")
 	}
 	defer span.Finish()
 	spotifyToken := r.Header.Get("spotify-token")
 	artistID := chi.URLParam(r, "id")
-	artistInfo, err := s.service.Artist(r.Context(), spotifyToken, artistID)
+	artistInfo, err := s.service.Artist(ctx, spotifyToken, artistID)
 
 	if err != nil && (strings.Contains(err.Error(), "The access token expired") || strings.Contains(err.Error(), "Invalid access token")) {
 		http.Error(w, "", http.StatusUnauthorized)

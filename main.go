@@ -9,6 +9,7 @@ import (
 	"github.com/akrylysov/algnhsa"
 	"github.com/getsentry/sentry-go"
 	"github.com/joho/godotenv"
+
 	log "github.com/sirupsen/logrus"
 )
 
@@ -18,21 +19,24 @@ func main() {
 	}
 
 	sentrySyncTransport := sentry.NewHTTPSyncTransport()
-	err := sentry.Init(sentry.ClientOptions{
+	if err := sentry.Init(sentry.ClientOptions{
 		Dsn:              os.Getenv("SENTRY_DSN"),
 		AttachStacktrace: true,
 		Environment:      "production",
 		Transport:        sentrySyncTransport,
 		TracesSampleRate: 1.0,
-	})
-
-	if err != nil {
-		log.Error("sentry.Init: %s", err)
+	}); err != nil {
+		log.Errorf("sentry.Init: %s", err)
 		os.Exit(1)
 	}
 
 	isAWS := os.Getenv("AWS_REGION")
-	server := routes.CreateServer()
+	srvCfg := routes.Config{
+		SpotifyCallBackURI:  os.Getenv("CALLBACK_URI"),
+		SpotifyDashboardURI: os.Getenv("DASHBOARD_URI"),
+		LastFMToken:         os.Getenv("LASTFM_API_KEY"),
+	}
+	server := routes.CreateServer(srvCfg)
 
 	if isAWS != "" {
 		//only if production:

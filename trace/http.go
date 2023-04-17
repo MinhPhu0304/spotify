@@ -30,7 +30,9 @@ func (t *tracingTransport) RoundTrip(req *http.Request) (*http.Response, error) 
 
 	response, err := t.RoundTripper.RoundTrip(req)
 
-	span.Data["http_code"] = response.StatusCode
+	if response != nil {
+		span.Data["http_code"] = response.StatusCode
+	}
 
 	return response, err
 }

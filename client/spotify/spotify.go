@@ -76,7 +76,7 @@ func (s *Spotify) TopTracks(ctx context.Context, token string, opts ...spotify.R
 		return []spotify.FullTrack{}, errors.Wrap(err, "fail to get spotify top tracks")
 	}
 	defer func() {
-		s.repo.InsertUserTopTracks(result.Tracks, token, nil)
+		s.repo.InsertUserTopTracks(result.Tracks, token)
 	}()
 	return result.Tracks, nil
 }
@@ -106,5 +106,9 @@ func allTrackID(tracks []spotify.FullTrack) []spotify.ID {
 }
 
 func (s *Spotify) clientWithTrace(ctx context.Context, token string) *spotify.Client {
-	return spotify.New(trace.WrapWithTrace(s.spotifyAuth.Client(ctx, &oauth2.Token{AccessToken: token})))
+	if c, _ := s.repo.GetSpotifyClient(token); c != nil {
+		return c
+	}
+	spc := s.spotifyAuth.Client(ctx, &oauth2.Token{AccessToken: token})
+	return spotify.New(trace.WrapWithTrace(spc))
 }
