@@ -30,16 +30,6 @@ func (s *Spotify) Artist(ctx context.Context, token string, artistID string, las
 		return types.ArtistInfo{}, errors.Wrap(err, "failed to get spotify artist")
 	}
 
-	u, err := s.currentUser(ctx, spotifyClient, token)
-	if err != nil {
-		return types.ArtistInfo{}, errors.Wrap(err, "failed to get user info")
-	}
-
-	topTracks, err := spotifyClient.GetArtistsTopTracks(ctx, spotify.ID(artistID), u.Country)
-	if err != nil {
-		return types.ArtistInfo{}, errors.Wrap(err, "failed to get spotify artist top tracks")
-	}
-
 	bio := lastfmtype.LastFMBio{}
 	wg := sync.WaitGroup{}
 	wg.Add(1)
@@ -56,6 +46,16 @@ func (s *Spotify) Artist(ctx context.Context, token string, artistID string, las
 			bio = *abio
 		}
 	}()
+
+	u, err := s.currentUser(ctx, spotifyClient, token)
+	if err != nil {
+		return types.ArtistInfo{}, errors.Wrap(err, "failed to get user info")
+	}
+
+	topTracks, err := spotifyClient.GetArtistsTopTracks(ctx, spotify.ID(artistID), u.Country)
+	if err != nil {
+		return types.ArtistInfo{}, errors.Wrap(err, "failed to get spotify artist top tracks")
+	}
 
 	f := make(map[string]spotify.AudioFeatures)
 	var errF error
