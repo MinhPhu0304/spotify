@@ -3,7 +3,7 @@
 echo "How does this work, I don't know (╯ಠ‿ಠ )╯︵┻━┻ "
 echo "Build for linux architecture"
 
-GOOS=linux GOARCH=amd64 go build -o main main.go
+GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o main main.go
 
 echo "Zip stuff toghether"
 zip main.zip main
