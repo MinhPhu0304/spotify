@@ -3,6 +3,7 @@ package trace
 import (
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/getsentry/sentry-go"
 )
@@ -25,9 +26,6 @@ func (t *tracingTransport) RoundTrip(req *http.Request) (*http.Response, error) 
 		span.Data = make(map[string]interface{})
 	}
 
-	// adding sentry header for distributed tracing
-	req.Header.Add("sentry-trace", span.TraceID.String())
-
 	response, err := t.RoundTripper.RoundTrip(req)
 
 	if response != nil {
@@ -44,6 +42,7 @@ func WrapWithTrace(client *http.Client) *http.Client {
 
 func DefaultTracedClient() *http.Client {
 	c := &http.Client{
+		Timeout:   1 * time.Minute,
 		Transport: newTracingTransport(http.DefaultTransport),
 	}
 	return c

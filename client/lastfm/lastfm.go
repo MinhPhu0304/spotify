@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"net/url"
 	"regexp"
-	"time"
 
 	"github.com/pkg/errors"
 
@@ -29,9 +28,7 @@ type lastFMClient struct {
 var linkRegex = regexp.MustCompile(`<a[^>]*>|<\/a>`)
 
 func Client(token string) LastFMClient {
-	c := trace.WrapWithTrace(&http.Client{
-		Timeout: 1 * time.Minute, // Something is really wrong to take 1 min
-	})
+	c := trace.DefaultTracedClient()
 	return &lastFMClient{
 		token:  token,
 		url:    "http://ws.audioscrobbler.com/2.0",
