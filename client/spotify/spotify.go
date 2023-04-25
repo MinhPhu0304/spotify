@@ -106,9 +106,6 @@ func allTrackID(tracks []spotify.FullTrack) []spotify.ID {
 }
 
 func (s *Spotify) clientWithTrace(ctx context.Context, token string) *spotify.Client {
-	if c, _ := s.repo.GetSpotifyClient(token); c != nil {
-		return c
-	}
 	spc := s.spotifyAuth.Client(ctx, &oauth2.Token{AccessToken: token})
 	return spotify.New(trace.WrapWithTrace(spc))
 }

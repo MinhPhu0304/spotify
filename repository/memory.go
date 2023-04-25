@@ -20,8 +20,6 @@ type Repository interface {
 	InsertUserTopTracks(topTracks []spotify.FullTrack, userToken string) error
 	GetGenres() ([]string, error)
 	InsertGenres(genres []string, duration *time.Duration) error
-	GetSpotifyClient(token string) (*spotify.Client, error)
-	InsertSpotifyClient(token string, client *spotify.Client) error
 	GetSpotifyArtist(artistID string) (*spotify.FullArtist, error)
 	InsertSpotifyArtist(artist *spotify.FullArtist) error
 	GetArtistInfo(artistID string) (*types.ArtistInfo, error)
@@ -47,7 +45,6 @@ var (
 	topArtistNamespace        = "top-artist-"
 	userTopTrackNamespace     = "user-top-tracks-"
 	songNamespace             = "song-bio-"
-	spotifyClientNamespace    = "spotify-client-"
 	spotifyFullTrackNamespace = "spotify-fulltrack-"
 	spotifyArtistNamespace    = "spotify-artist-"
 	spotifyGenres             = "spotify-genres"
@@ -135,26 +132,6 @@ func (r *inMemoryRepository) GetGenres() ([]string, error) {
 		return nil, ErrInvalidType
 	}
 	return v.([]string), nil
-}
-
-func (r *inMemoryRepository) GetSpotifyClient(token string) (*spotify.Client, error) {
-	cacheKey := spotifyClientNamespace + token
-	c, ok := r.cache.Get(cacheKey)
-	if !ok {
-		return nil, ErrNotFound
-	}
-
-	if c, valid := c.(*spotify.Client); !valid {
-		r.cache.Delete(cacheKey)
-		return nil, ErrInvalidType
-	} else {
-		return c, nil
-	}
-}
-
-func (r *inMemoryRepository) InsertSpotifyClient(token string, client *spotify.Client) error {
-	cacheKey := spotifyClientNamespace + token
-	return r.cache.Add(cacheKey, client, cache.DefaultExpiration)
 }
 
 func (r *inMemoryRepository) GetSpotifyArtist(artistID string) (*spotify.FullArtist, error) {
